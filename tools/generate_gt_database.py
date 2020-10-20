@@ -12,13 +12,15 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--save_dir', type=str, default='./gt_database')
 parser.add_argument('--class_name', type=str, default='Car')
 parser.add_argument('--split', type=str, default='train')
+parser.add_argument('--ignore_difficulty', action="store_true", default='true')
+
 args = parser.parse_args()
 
-
 class GTDatabaseGenerator(KittiDataset):
-    def __init__(self, root_dir, split='train', classes=args.class_name):
+    def __init__(self, root_dir, split='train', classes=args.class_name, ignore_diff=False):
         super().__init__(root_dir, split=split)
         self.gt_database = None
+        self.ignore_diff = ignore_diff
         if classes == 'Car':
             self.classes = ('Background', 'Car')
         elif classes == 'People':
@@ -50,6 +52,8 @@ class GTDatabaseGenerator(KittiDataset):
     def generate_gt_database(self):
         gt_database = []
         for idx, sample_id in enumerate(self.image_idx_list):
+            if idx > 4000:
+                break
             sample_id = int(sample_id)
             print('process gt sample (id=%06d)' % sample_id)
 
@@ -58,7 +62,10 @@ class GTDatabaseGenerator(KittiDataset):
             pts_rect = calib.lidar_to_rect(pts_lidar[:, 0:3])
             pts_intensity = pts_lidar[:, 3]
 
-            obj_list = self.filtrate_objects(self.get_label(sample_id))
+            if not self.ignore_diff:
+                obj_list = self.filtrate_objects(self.get_label(sample_id))
+            else:
+                obj_list = self.get_label(sample_id)
 
             gt_boxes3d = np.zeros((obj_list.__len__(), 7), dtype=np.float32)
             for k, obj in enumerate(obj_list):
@@ -92,7 +99,9 @@ class GTDatabaseGenerator(KittiDataset):
 
 
 if __name__ == '__main__':
-    dataset = GTDatabaseGenerator(root_dir='../data/', split=args.split)
+
+    # MODIFIED TO POINT TO REALSENSE DATA
+    dataset = GTDatabaseGenerator(root_dir='../data_zed/', split=args.split, ignore_diff=args.ignore_difficulty)
     os.makedirs(args.save_dir, exist_ok=True)
 
     dataset.generate_gt_database()
